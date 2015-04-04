@@ -1,11 +1,11 @@
 public class SAP {
 
-	private Digraph g;
+	private final Digraph g;
 	private static int INFINITE = Integer.MAX_VALUE;
 
 	// constructor takes a digraph (not necessarily a DAG)
 	public SAP(Digraph G) {
-		g = G;
+		g = new Digraph(G);
 	}
 
 	// length of shortest ancestral path between v and w; -1 if no such path
