@@ -25,7 +25,7 @@ public class SeamCarver {
 	}
 
 	// energy of pixel at column x and row y
-	public double energy(int x, int y) {
+	public double energy(int x, int y) { 
 		// border pixels have 3*255^2
 		if (x == 0 || x == picture.width() - 1 || y == 0 || y == picture.height() - 1) {
 			return 3 * Math.pow(RGB_MAX, 2);
