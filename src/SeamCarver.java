@@ -5,15 +5,19 @@ public class SeamCarver {
 	private Picture picture;
 	private static int RGB_MAX = 0xFF;
 	private double[][] energyArray;
+	private double[][] energyArrayT;
 
 	// create a seam carver object based on the given picture
 	public SeamCarver(Picture picture) {
 		this.picture = picture;
 		energyArray = new double[height()][width()];
+		energyArrayT = new double[width()][height()];
 
 		for (int h = 0; h < height(); h++) {
 			for (int w = 0; w < width(); w++) {
-				energyArray[h][w] = energy(w, h);
+				double energy = energy(w, h);
+				energyArray[h][w] = energy;
+				energyArrayT[w][h] = energy;
 			}
 		}
 	}
@@ -39,102 +43,178 @@ public class SeamCarver {
 		if (x == 0 || x == picture.width() - 1 || y == 0 || y == picture.height() - 1) {
 			return 3 * Math.pow(RGB_MAX, 2);
 		} else {
-			return (sumSquare(x + 1, y) - sumSquare(x - 1, y)) + (sumSquare(x, y + 1) - sumSquare(x, y - 1));
+			return deltaX(x, y) + deltaY(x, y);
 		}
 	}
 
-	private double sumSquare(int x1, int x2, int y1, int y2) {
-		Color color1 = picture.get(x1, y1);
-		Color color2 = picture.get(x2, y2);
-		return Math.pow(color1.getRed() - color2.getRed(), 2) + Math.pow(color1.getBlue() - color2.getBlue(), 2) + Math.pow(color1.getGreen() - color2.getGreen(), 2);
+	private double deltaX(int x, int y) {
+		Color color1 = picture.get(x - 1, y);
+		Color color2 = picture.get(x + 1, y);
+		return Math.pow(color1.getRed() - color2.getRed(), 2) + Math.pow(color1.getBlue() - color2.getBlue(), 2)
+				+ Math.pow(color1.getGreen() - color2.getGreen(), 2);
+	}
+
+	private double deltaY(int x, int y) {
+		Color color1 = picture.get(x, y - 1);
+		Color color2 = picture.get(x, y + 1);
+		return Math.pow(color1.getRed() - color2.getRed(), 2) + Math.pow(color1.getBlue() - color2.getBlue(), 2)
+				+ Math.pow(color1.getGreen() - color2.getGreen(), 2);
 	}
 
 	// sequence of indices for horizontal seam
 	public int[] findHorizontalSeam() {
-		int[] result = new int[height()];
+		Stack<Integer> stack = null;
 		double minDist = Double.MAX_VALUE;
 		for (int row = 1; row < height() - 1; row++) {
-			ShortestPath sp = findHorizontalSP(row);
+			ShortestPath sp = findVerticalSP(row, energyArrayT, width(), height());
 			if (sp.getMinDist() < minDist) {
 				minDist = sp.getMinDist();
-				result = sp.getIndices();
+				stack = sp.getIndices();
+			}
+		}
+		int[] result = new int[width()];
+		if (stack != null) {
+			for (int i = 0; i < result.length; i++) {
+				result[i] = stack.pop();
 			}
 		}
 		return result;
 	}
 
-	// x is row number
-	private ShortestPath findHorizontalSP(int x) {
-		boolean[][] marked = new boolean[height()][width()];
-		double[][] distTo = new double[height()][width()];
-		int[][] lastEdge = new int[height()][width()];
+	// sequence of indices for vertical seam
+	public int[] findVerticalSeam() {
+		Stack<Integer> stack = null;
+		double minDist = Double.MAX_VALUE;
+		for (int col = 1; col < width() - 1; col++) {
+			ShortestPath sp = findVerticalSP(col, energyArray, height(), width());
+			if (sp.getMinDist() < minDist) {
+				minDist = sp.getMinDist();
+				stack = sp.getIndices();
+			}
+		}
+		int[] result = new int[height()];
+		if (stack != null) {
+			for (int i = 0; i < result.length; i++) {
+				result[i] = stack.pop();
+			}
+		}
+		return result;
+	}
+
+	// arg is row number
+	private ShortestPath findVerticalSP(int col, double[][] energyArr, int height, int width) {
+		double[][] distTo = new double[height][width];
+		int[][] lastEdge = new int[height][width];
 		// init marked, lastEdge and distTo
-		for (int r = 0; r < height(); r++) {
-			for (int c = 0; c < height(); c++) {
-				marked[r][c] = false;
+		for (int r = 0; r < height; r++) {
+			for (int c = 0; c < width; c++) {
 				distTo[r][c] = Double.MAX_VALUE;
 				lastEdge[r][c] = Integer.MAX_VALUE;
 			}
 		}
 		int row = 0;
-		distTo[row][x] = 0;
-		LinkedList<Integer> currLayer = new LinkedList<Integer>();
-		currLayer.add(x);
-		LinkedList<int[]> edgesToNextLayer = new LinkedList<int[]>();
-		int first, last;
-		while (row != width()=1) {
+		distTo[0][col] = 0;
+		LinkedList<Integer> vOnPrevLayer = new LinkedList<Integer>();
+		vOnPrevLayer.add(col);
+		Queue<int[]> eToCurrLayer = new Queue<int[]>();
+		populateEdgesToNextLayer(vOnPrevLayer, eToCurrLayer, width);
+		while (++row != height) {
 			// relax edges from previous layers that point to current layer
-			for (Integer i: nextLayerIndices){
-				if (distTo)
+			while (!eToCurrLayer.isEmpty()) {
+				int[] edge = eToCurrLayer.dequeue();
+				double newDist = distTo[row - 1][edge[0]] + energyArr[row][edge[1]];
+				if (newDist < distTo[row][edge[1]]) {
+					distTo[row][edge[1]] = newDist;
+					lastEdge[row][edge[1]] = edge[0];
+				}
 			}
-			
-			// populate next layer indices
-			if ((first = nextLayerIndices.getFirst()) > 0) {
-				nextLayerIndices.addFirst(first - 1);
+			populateCurrLayerNodes(vOnPrevLayer, width);
+			populateEdgesToNextLayer(vOnPrevLayer, eToCurrLayer, width);
+		}
+
+		// construct shortestPath
+		int selectedC = Integer.MAX_VALUE;
+		double shortestDist = Double.MAX_VALUE;
+		for (int c = 0; c < width; c++) {
+			if (Double.compare(distTo[height - 1][c], shortestDist) < 1) {
+				selectedC = c;
+				shortestDist = distTo[height - 1][c];
 			}
-			if ((last = nextLayerIndices.getLast()) < height()) {
-				nextLayerIndices.addLast(last + 1);
-			}
-			
-			row++;
+		}
+		int prevCol = selectedC;
+		Stack<Integer> path = new Stack<Integer>();
+		for (int h = height - 1; h >= 0; h--) {
+			path.push(prevCol);
+			prevCol = lastEdge[h][prevCol];
+		}
+		return new ShortestPath(path, shortestDist);
+	}
+
+	private void populateCurrLayerNodes(LinkedList<Integer> currLayer, int wid) {
+		int first, last;
+		if ((first = currLayer.getFirst()) > 0) {
+			currLayer.addFirst(first - 1);
+		}
+		if ((last = currLayer.getLast()) < wid - 1) {
+			currLayer.addLast(last + 1);
 		}
 	}
 
-	// sequence of indices for vertical seam
-	public int[] findVerticalSeam() {
-		int[] result = new int[height()];
-		// double minDist = Double.MAX_VALUE;
-		// for (int col = 1; col < width() - 1; col++) {
-		// ShortestPath sp = findVerticalSP(col);
-		// if (sp.getMinDist() < minDist) {
-		// minDist = sp.getMinDist();
-		// result = sp.getIndices();
-		// }
-		// }
-		return result;
+	private void populateEdgesToNextLayer(LinkedList<Integer> currLayer, Queue<int[]> layerQueue, int wid) {
+		for (Integer i : currLayer) {
+			layerQueue.enqueue(new int[] { i, i });
+			if (i > 0) {
+				layerQueue.enqueue(new int[] { i, i - 1 });
+			}
+			if (i < wid - 1) {
+				layerQueue.enqueue(new int[] { i, i + 1 });
+			}
+		}
 	}
 
 	// remove horizontal seam from current picture
 	public void removeHorizontalSeam(int[] seam) {
-
+		Picture newPic = new Picture(width(), height() - 1);
+		int oldRow = 0;
+		for (int col = 0; col < newPic.width(); col++) {
+			for (int row = 0; row < newPic.height(); row++) {
+				oldRow = row;
+				if (seam[col] == row) {
+					oldRow++;
+				}
+				newPic.set(col, row, picture.get(col, oldRow));
+			}
+		}
+		this.picture = newPic;
 	}
 
 	// remove vertical seam from current picture
 	public void removeVerticalSeam(int[] seam) {
-
+		Picture newPic = new Picture(width(), height() - 1);
+		int oldCol = 0;
+		for (int row = 0; row < newPic.height(); row++) {
+			for (int col = 0; col < newPic.width(); col++) {
+				oldCol = col;
+				if (seam[row] == col) {
+					oldCol++;
+				}
+				newPic.set(col, row, picture.get(oldCol, row));
+			}
+		}
+		this.picture = newPic;
 	}
 }
 
 class ShortestPath {
-	int[] indices;
+	Stack<Integer> indices;
 	double minDist;
 
-	public ShortestPath(int[] indices, double minDist) {
+	public ShortestPath(Stack<Integer> indices, double minDist) {
 		this.indices = indices;
 		this.minDist = minDist;
 	}
 
-	public int[] getIndices() {
+	public Stack<Integer> getIndices() {
 		return indices;
 	}
 
