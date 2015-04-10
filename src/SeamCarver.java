@@ -39,6 +39,9 @@ public class SeamCarver {
 
 	// energy of pixel at column x and row y
 	public double energy(int x, int y) {
+		if (x < 0 || x >= width() || y < 0 || y >= height()) {
+			throw new IndexOutOfBoundsException();
+		}
 		// border pixels have 3*255^2
 		if (x == 0 || x == picture.width() - 1 || y == 0 || y == picture.height() - 1) {
 			return 3 * Math.pow(RGB_MAX, 2);
@@ -213,13 +216,18 @@ public class SeamCarver {
 		if (seam == null) {
 			throw new NullPointerException("arg cannot be null");
 		}
-		if (isVertical) {
-			if (seam.length != width() - 1 || width() <= 1) {
+		if (!isVertical) {
+			if (seam.length != width() || width() <= 1) {
 				throw new IllegalArgumentException("arg array has invalid size");
 			}
 		} else {
-			if (seam.length != height() - 1 || height() <= 1) {
+			if (seam.length != height() || height() <= 1) {
 				throw new IllegalArgumentException("arg array has invalid size");
+			}
+		}
+		for (int i = 0; i < seam.length - 1; i++) {
+			if (Math.abs(seam[i] - seam[i + 1]) > 1) {
+				throw new IllegalArgumentException("adjacent entries differ by more than 1");
 			}
 		}
 	}
