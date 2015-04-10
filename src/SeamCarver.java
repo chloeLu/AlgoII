@@ -117,7 +117,7 @@ public class SeamCarver {
 		LinkedList<Integer> vOnPrevLayer = new LinkedList<Integer>();
 		vOnPrevLayer.add(col);
 		Queue<int[]> eToCurrLayer = new Queue<int[]>();
-		populateEdgesToNextLayer(vOnPrevLayer, eToCurrLayer, width);
+		updateEdgesToNextLayer(vOnPrevLayer, eToCurrLayer, width);
 		while (++row != height) {
 			// relax edges from previous layers that point to current layer
 			while (!eToCurrLayer.isEmpty()) {
@@ -128,8 +128,9 @@ public class SeamCarver {
 					lastEdge[row][edge[1]] = edge[0];
 				}
 			}
-			populateCurrLayerNodes(vOnPrevLayer, width);
-			populateEdgesToNextLayer(vOnPrevLayer, eToCurrLayer, width);
+
+			updateCurrLayerNodes(vOnPrevLayer, width);
+			updateEdgesToNextLayer(vOnPrevLayer, eToCurrLayer, width);
 		}
 
 		// construct shortestPath
@@ -150,7 +151,7 @@ public class SeamCarver {
 		return new ShortestPath(path, shortestDist);
 	}
 
-	private void populateCurrLayerNodes(LinkedList<Integer> currLayer, int wid) {
+	private void updateCurrLayerNodes(LinkedList<Integer> currLayer, int wid) {
 		int first, last;
 		if ((first = currLayer.getFirst()) > 0) {
 			currLayer.addFirst(first - 1);
@@ -160,7 +161,7 @@ public class SeamCarver {
 		}
 	}
 
-	private void populateEdgesToNextLayer(LinkedList<Integer> currLayer, Queue<int[]> layerQueue, int wid) {
+	private void updateEdgesToNextLayer(LinkedList<Integer> currLayer, Queue<int[]> layerQueue, int wid) {
 		for (Integer i : currLayer) {
 			layerQueue.enqueue(new int[] { i, i });
 			if (i > 0) {
@@ -174,15 +175,17 @@ public class SeamCarver {
 
 	// remove horizontal seam from current picture
 	public void removeHorizontalSeam(int[] seam) {
+		validateRemovalArg(seam, false);
 		Picture newPic = new Picture(width(), height() - 1);
-		int oldRow = 0;
+		int oldRow;
 		for (int col = 0; col < newPic.width(); col++) {
+			oldRow = 0;
 			for (int row = 0; row < newPic.height(); row++) {
-				oldRow = row;
 				if (seam[col] == row) {
 					oldRow++;
 				}
 				newPic.set(col, row, picture.get(col, oldRow));
+				oldRow++;
 			}
 		}
 		this.picture = newPic;
@@ -190,18 +193,35 @@ public class SeamCarver {
 
 	// remove vertical seam from current picture
 	public void removeVerticalSeam(int[] seam) {
-		Picture newPic = new Picture(width(), height() - 1);
-		int oldCol = 0;
+		validateRemovalArg(seam, true);
+		Picture newPic = new Picture(width() - 1, height());
+		int oldCol;
 		for (int row = 0; row < newPic.height(); row++) {
+			oldCol = 0;
 			for (int col = 0; col < newPic.width(); col++) {
-				oldCol = col;
 				if (seam[row] == col) {
 					oldCol++;
 				}
 				newPic.set(col, row, picture.get(oldCol, row));
+				oldCol++;
 			}
 		}
 		this.picture = newPic;
+	}
+
+	private void validateRemovalArg(int[] seam, boolean isVertical) {
+		if (seam == null) {
+			throw new NullPointerException("arg cannot be null");
+		}
+		if (isVertical) {
+			if (seam.length != width() - 1 || width() <= 1) {
+				throw new IllegalArgumentException("arg array has invalid size");
+			}
+		} else {
+			if (seam.length != height() - 1 || height() <= 1) {
+				throw new IllegalArgumentException("arg array has invalid size");
+			}
+		}
 	}
 }
 
