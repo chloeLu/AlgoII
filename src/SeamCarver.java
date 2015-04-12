@@ -73,7 +73,7 @@ public class SeamCarver {
 	public int[] findHorizontalSeam() {
 		double minDist = Double.MAX_VALUE;
 		int[] result = null;
-		for (int row = 1; row < height() - 1; row++) {
+		for (int row = 1; row < height(); row++) {
 			ShortestPath sp = findVerticalSP(row, true);
 			if (sp.getMinDist() < minDist) {
 				minDist = sp.getMinDist();
@@ -87,7 +87,7 @@ public class SeamCarver {
 	public int[] findVerticalSeam() {
 		double minDist = Double.MAX_VALUE;
 		int[] result = null;
-		for (int col = 1; col < width() - 1; col++) {
+		for (int col = 1; col < width(); col++) {
 			ShortestPath sp = findVerticalSP(col, false);
 			if (sp.getMinDist() < minDist) {
 				minDist = sp.getMinDist();
@@ -119,22 +119,19 @@ public class SeamCarver {
 		distTo[0][col] = 0;
 		LinkedList<Integer> vOnPrevLayer = new LinkedList<Integer>();
 		vOnPrevLayer.add(col);
-		Queue<int[]> eToCurrLayer = new Queue<int[]>();
-		updateEdgesToNextLayer(vOnPrevLayer, eToCurrLayer, width);
+		LinkedList<int[]> eToCurrLayer = new LinkedList<int[]>();
+		updateNodesAndEdges(vOnPrevLayer, eToCurrLayer, width);
 		while (++row != height) {
 			// edge: [0]:from [1]:to
 			// relax edges from previous layers that point to current layer
-			while (!eToCurrLayer.isEmpty()) {
-				int[] edge = eToCurrLayer.dequeue();
+			for (int[] edge : eToCurrLayer) {
 				double newDist = distTo[row - 1][edge[0]] + getEnergy(row, edge[1], transpose);
 				if (newDist < distTo[row][edge[1]]) {
 					distTo[row][edge[1]] = newDist;
 					lastEdge[row][edge[1]] = edge[0];
 				}
 			}
-
-			updateCurrLayerNodes(vOnPrevLayer, width);
-			updateEdgesToNextLayer(vOnPrevLayer, eToCurrLayer, width);
+			updateNodesAndEdges(vOnPrevLayer, eToCurrLayer, width);
 		}
 
 		// construct shortestPath
@@ -159,27 +156,41 @@ public class SeamCarver {
 		return transpose ? energyArray[y][x] : energyArray[x][y];
 	}
 
-	private void updateCurrLayerNodes(LinkedList<Integer> currLayer, int wid) {
+	private void updateNodesAndEdges(LinkedList<Integer> nodes, LinkedList<int[]> edges, int wid) {
 		int first, last;
-		if ((first = currLayer.getFirst()) > 0) {
-			currLayer.addFirst(first - 1);
+		if ((first = nodes.getFirst()) > 0) {
+			nodes.addFirst(first - 1);
+			edges.addFirst(new int[] { first, first });
+			edges.addFirst(new int[] { first, first - 1 });
+			if (first < wid - 1) {
+				edges.addFirst(new int[] { first, first + 1 });
+			}
+		} else if (edges.getFirst()[0] != edges.getFirst()[1]) {
+			edges.add(new int[]{nodes.getFirst(), nodes.getFirst()});
 		}
-		if ((last = currLayer.getLast()) < wid - 1) {
-			currLayer.addLast(last + 1);
+		if ((last = nodes.getLast()) < wid - 1) {
+			nodes.addLast(last + 1);
+			edges.addFirst(new int[] { last, last });
+			edges.addFirst(new int[] { last, last + 1 });
+			if (last > 0) {
+				edges.addFirst(new int[] { last, last - 1 });
+			}
+		} else if (edges.getLast()[0] != edges.getLast()[1]) {
+			edges.add(new int[]{nodes.getLast(), nodes.getLast()});
 		}
 	}
 
-	private void updateEdgesToNextLayer(LinkedList<Integer> currLayer, Queue<int[]> layerQueue, int wid) {
-		for (Integer i : currLayer) {
-			layerQueue.enqueue(new int[] { i, i });
-			if (i > 0) {
-				layerQueue.enqueue(new int[] { i, i - 1 });
-			}
-			if (i < wid - 1) {
-				layerQueue.enqueue(new int[] { i, i + 1 });
-			}
-		}
-	}
+	// private void updateEdgesToNextLayer(LinkedList<Integer> currLayer, Queue<int[]> layerQueue, int wid) {
+	// for (Integer i : currLayer) {
+	// layerQueue.enqueue(new int[] { i, i });
+	// if (i > 0) {
+	// layerQueue.enqueue(new int[] { i, i - 1 });
+	// }
+	// if (i < wid - 1) {
+	// layerQueue.enqueue(new int[] { i, i + 1 });
+	// }
+	// }
+	// }
 
 	// remove horizontal seam from current picture
 	public void removeHorizontalSeam(int[] seam) {
