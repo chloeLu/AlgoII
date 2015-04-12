@@ -1,5 +1,4 @@
 import java.awt.Color;
-import java.util.LinkedList;
 
 public class SeamCarver {
 	private Picture picture;
@@ -71,34 +70,16 @@ public class SeamCarver {
 
 	// sequence of indices for horizontal seam
 	public int[] findHorizontalSeam() {
-		double minDist = Double.MAX_VALUE;
-		int[] result = null;
-		for (int row = 1; row < height(); row++) {
-			ShortestPath sp = findVerticalSP(row, true);
-			if (sp.getMinDist() < minDist) {
-				minDist = sp.getMinDist();
-				result = sp.getIndices();
-			}
-		}
-		return result;
+		return findVerticalSP(true);
 	}
 
 	// sequence of indices for vertical seam
 	public int[] findVerticalSeam() {
-		double minDist = Double.MAX_VALUE;
-		int[] result = null;
-		for (int col = 1; col < width(); col++) {
-			ShortestPath sp = findVerticalSP(col, false);
-			if (sp.getMinDist() < minDist) {
-				minDist = sp.getMinDist();
-				result = sp.getIndices();
-			}
-		}
-		return result;
+		return findVerticalSP(false);
 	}
 
 	// arg is row number
-	private ShortestPath findVerticalSP(int col, boolean transpose) {
+	private int[] findVerticalSP(boolean transpose) {
 		int height = height(), width = width();
 		if (transpose) {
 			height = width();
@@ -107,34 +88,41 @@ public class SeamCarver {
 
 		double[][] distTo = new double[height][width];
 		int[][] lastEdge = new int[height][width];
-		// init marked, lastEdge and distTo
-		for (int r = 0; r < height; r++) {
+		// init distTo. the 1st row has distTo=0
+		for (int c = 0; c < width; c++) {
+			distTo[0][c] = 0d;
+		}
+		for (int r = 1; r < height; r++) {
 			for (int c = 0; c < width; c++) {
 				distTo[r][c] = Double.MAX_VALUE;
-				lastEdge[r][c] = Integer.MAX_VALUE;
 			}
 		}
 
 		int row = 0;
-		distTo[0][col] = 0;
-		LinkedList<Integer> vOnPrevLayer = new LinkedList<Integer>();
-		vOnPrevLayer.add(col);
-		LinkedList<int[]> eToCurrLayer = new LinkedList<int[]>();
-		updateNodesAndEdges(vOnPrevLayer, eToCurrLayer, width);
 		while (++row != height) {
 			// edge: [0]:from [1]:to
 			// relax edges from previous layers that point to current layer
-			for (int[] edge : eToCurrLayer) {
-				double newDist = distTo[row - 1][edge[0]] + getEnergy(row, edge[1], transpose);
-				if (newDist < distTo[row][edge[1]]) {
-					distTo[row][edge[1]] = newDist;
-					lastEdge[row][edge[1]] = edge[0];
+			for (int v = 0; v < width; v++) {
+				double newDistUL = v > 0 ? distTo[row - 1][v - 1] + getEnergy(row, v, transpose) : Double.MAX_VALUE;
+				if (newDistUL < distTo[row][v]) {
+					distTo[row][v] = newDistUL;
+					lastEdge[row][v] = v-1;
+				}
+				double newDistU = distTo[row - 1][v] + getEnergy(row, v, transpose);
+				if (newDistU < distTo[row][v]) {
+					distTo[row][v] = newDistU;
+					lastEdge[row][v] = v;
+				}
+				double newDistUR = v < width - 1 ? distTo[row - 1][v + 1] + getEnergy(row, v, transpose)
+						: Double.MAX_VALUE;
+				if (newDistUR < distTo[row][v]) {
+					distTo[row][v] = newDistUR;
+					lastEdge[row][v] = v+1;
 				}
 			}
-			updateNodesAndEdges(vOnPrevLayer, eToCurrLayer, width);
 		}
 
-		// construct shortestPath
+		// return seam
 		int selectedC = Integer.MAX_VALUE;
 		double shortestDist = Double.MAX_VALUE;
 		for (int c = 0; c < width; c++) {
@@ -149,48 +137,12 @@ public class SeamCarver {
 			path[h] = prevCol;
 			prevCol = lastEdge[h][prevCol];
 		}
-		return new ShortestPath(path, shortestDist);
+		return path;
 	}
-
+	
 	private double getEnergy(int x, int y, boolean transpose) {
 		return transpose ? energyArray[y][x] : energyArray[x][y];
 	}
-
-	private void updateNodesAndEdges(LinkedList<Integer> nodes, LinkedList<int[]> edges, int wid) {
-		int first, last;
-		if ((first = nodes.getFirst()) > 0) {
-			nodes.addFirst(first - 1);
-			edges.addFirst(new int[] { first, first });
-			edges.addFirst(new int[] { first, first - 1 });
-			if (first < wid - 1) {
-				edges.addFirst(new int[] { first, first + 1 });
-			}
-		} else if (edges.getFirst()[0] != edges.getFirst()[1]) {
-			edges.add(new int[]{nodes.getFirst(), nodes.getFirst()});
-		}
-		if ((last = nodes.getLast()) < wid - 1) {
-			nodes.addLast(last + 1);
-			edges.addFirst(new int[] { last, last });
-			edges.addFirst(new int[] { last, last + 1 });
-			if (last > 0) {
-				edges.addFirst(new int[] { last, last - 1 });
-			}
-		} else if (edges.getLast()[0] != edges.getLast()[1]) {
-			edges.add(new int[]{nodes.getLast(), nodes.getLast()});
-		}
-	}
-
-	// private void updateEdgesToNextLayer(LinkedList<Integer> currLayer, Queue<int[]> layerQueue, int wid) {
-	// for (Integer i : currLayer) {
-	// layerQueue.enqueue(new int[] { i, i });
-	// if (i > 0) {
-	// layerQueue.enqueue(new int[] { i, i - 1 });
-	// }
-	// if (i < wid - 1) {
-	// layerQueue.enqueue(new int[] { i, i + 1 });
-	// }
-	// }
-	// }
 
 	// remove horizontal seam from current picture
 	public void removeHorizontalSeam(int[] seam) {
