@@ -139,8 +139,8 @@ public class BaseballElimination {
 		int t2 = 1;
 		for (int i = 1; i <= nGameVertices; i++) {
 			// get capacity
-			int t11 = t1 >= teamIdx ? t1 : t1 + 1;
-			int t12 = t2 >= teamIdx ? t2 : t2 + 1;
+			int t11 = t1 >= teamIdx ? t1+1 : t1;
+			int t12 = t2 >= teamIdx ? t2+1 : t2;
 			Integer num = remainingMatches.get(new Match(t11, t12));
 
 			// s -> gameVertices: how many remaining matches
@@ -208,8 +208,8 @@ public class BaseballElimination {
 		int t2 = 1;
 		for (int i = 1; i <= nGameVertices; i++) {
 			// get capacity
-			int t11 = t1 >= teamIdx ? t1 : t1 + 1;
-			int t12 = t2 >= teamIdx ? t2 : t2 + 1;
+			int t11 = t1 >= teamIdx ? t1+1 : t1;
+			int t12 = t2 >= teamIdx ? t2+1 : t2;
 			if (i == nGameV) {
 				return new int[] { t11, t12 };
 			}
@@ -249,8 +249,8 @@ public class BaseballElimination {
 }
 
 class Match {
-	private int t1;
-	private int t2;
+	private Integer t1;
+	private Integer t2;
 
 	public Match(int t1, int t2) {
 		this.t1 = t1;
@@ -264,5 +264,15 @@ class Match {
 			return (t1 == anotherMatch.t1 && t2 == anotherMatch.t2);
 		}
 		return false;
+	}
+	
+	@Override
+	public int hashCode() {
+		return t1.hashCode() + t2.hashCode();
+	}
+	
+	@Override
+	public String toString() {
+		return "Match [t1="+t1 + "; t2=" +t2 +"]";
 	}
 }
