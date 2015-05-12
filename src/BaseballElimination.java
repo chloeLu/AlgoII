@@ -122,10 +122,10 @@ public class BaseballElimination {
 		int nGameVertices = numTeams * (numTeams - 1) / 2;
 		for (int i = 1; i <= nGameVertices; i++) {
 			if (ff.inCut(i)) {
-				return false;
+				return true;
 			}
 		}
-		return true;
+		return false;
 	}
 
 	private FlowNetwork constructFlowNetwork(int teamIdx, int maxWins) {
@@ -149,8 +149,8 @@ public class BaseballElimination {
 			}
 
 			// gameVertices -> teamVertices: infinite capacity
-			fn.addEdge(new FlowEdge(i, nGameVertices + t1, Double.POSITIVE_INFINITY));
-			fn.addEdge(new FlowEdge(i, nGameVertices + t2, Double.POSITIVE_INFINITY));
+			fn.addEdge(new FlowEdge(i, nGameVertices + t1+1, Double.POSITIVE_INFINITY));
+			fn.addEdge(new FlowEdge(i, nGameVertices + t2+1, Double.POSITIVE_INFINITY));
 
 			// update team 1 and team 2
 			if (t2 == numTeams - 1) {
@@ -166,6 +166,7 @@ public class BaseballElimination {
 			t1 = (t1 == teamIdx) ? t1++ : t1;
 			int maxWinsRemainingT1 = maxWins - w[t1];
 			fn.addEdge(new FlowEdge(i, v - 1, (double) maxWinsRemainingT1));
+			t1++;
 		}
 
 		return fn;
@@ -245,6 +246,7 @@ public class BaseballElimination {
 				StdOut.println(team + " is not eliminated");
 			}
 		}
+		System.exit(0);
 	}
 }
 
