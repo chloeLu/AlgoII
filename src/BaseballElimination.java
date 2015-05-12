@@ -8,7 +8,6 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 
 public class BaseballElimination {
-	private int numTeams = 0;
 	private List<String> teams;
 	private int[] w;
 	private int[] l;
@@ -18,7 +17,7 @@ public class BaseballElimination {
 	// create a baseball division from given filename in format specified below
 	public BaseballElimination(String filename) {
 		In inFile = new In(new File(filename));
-		numTeams = inFile.readInt();
+		int numTeams = inFile.readInt();
 		teams = new ArrayList<String>(numTeams);
 		w = new int[numTeams];
 		l = new int[numTeams];
@@ -91,6 +90,11 @@ public class BaseballElimination {
 		int idx2 = teams.indexOf(team2);
 		validateArgs(idx1, idx2);
 
+		// cannot match with self
+		if (idx1==idx2){
+			return 0;
+		}
+		
 		// swap and put smaller idx in idx1
 		if (idx2 < idx1) {
 			int temp = idx1;
@@ -99,7 +103,11 @@ public class BaseballElimination {
 		}
 
 		Match match = new Match(idx1, idx2);
-		return remainingMatches.get(match);
+		try {
+			return remainingMatches.get(match);
+		} catch (NullPointerException npe) {
+			return 0;
+		}
 	}
 
 	// is given team eliminated?
@@ -107,10 +115,15 @@ public class BaseballElimination {
 		int teamIdx = teams.indexOf(team);
 		validateArgs(teamIdx);
 
+		// boundary case: no or only 1 team
+		if (teams.size() <= 1) {
+			return false;
+		}
+
 		// trivial reasons
 		int maxWins = w[teamIdx] + r[teamIdx];
 		for (int win : w) {
-			if (win >= maxWins) {
+			if (win > maxWins) {
 				return true;
 			}
 		}
@@ -118,7 +131,7 @@ public class BaseballElimination {
 		// flow diagram
 		FlowNetwork fn = constructFlowNetwork(teamIdx, maxWins);
 		FordFulkerson ff = new FordFulkerson(fn, 0, fn.V() - 1);
-		int numTeams = this.numTeams - 1;
+		int numTeams = teams.size() - 1;
 		int nGameVertices = numTeams * (numTeams - 1) / 2;
 		for (int i = 1; i <= nGameVertices; i++) {
 			if (ff.inCut(i)) {
@@ -129,7 +142,7 @@ public class BaseballElimination {
 	}
 
 	private FlowNetwork constructFlowNetwork(int teamIdx, int maxWins) {
-		int numTeams = this.numTeams - 1;
+		int numTeams = teams.size() - 1;
 		// construct flow network
 		int nGameVertices = numTeams * (numTeams - 1) / 2;
 		int v = 1 + nGameVertices + numTeams + 1; // s + 1stLayer + 2ndLayer + t
@@ -139,8 +152,8 @@ public class BaseballElimination {
 		int t2 = 1;
 		for (int i = 1; i <= nGameVertices; i++) {
 			// get capacity
-			int t11 = t1 >= teamIdx ? t1+1 : t1;
-			int t12 = t2 >= teamIdx ? t2+1 : t2;
+			int t11 = t1 >= teamIdx ? t1 + 1 : t1;
+			int t12 = t2 >= teamIdx ? t2 + 1 : t2;
 			Integer num = remainingMatches.get(new Match(t11, t12));
 
 			// s -> gameVertices: how many remaining matches
@@ -149,8 +162,8 @@ public class BaseballElimination {
 			}
 
 			// gameVertices -> teamVertices: infinite capacity
-			fn.addEdge(new FlowEdge(i, nGameVertices + t1+1, Double.POSITIVE_INFINITY));
-			fn.addEdge(new FlowEdge(i, nGameVertices + t2+1, Double.POSITIVE_INFINITY));
+			fn.addEdge(new FlowEdge(i, nGameVertices + t1 + 1, Double.POSITIVE_INFINITY));
+			fn.addEdge(new FlowEdge(i, nGameVertices + t2 + 1, Double.POSITIVE_INFINITY));
 
 			// update team 1 and team 2
 			if (t2 == numTeams - 1) {
@@ -163,7 +176,9 @@ public class BaseballElimination {
 
 		t1 = 0;
 		for (int i = nGameVertices + 1; i < v - 1; i++) {
-			t1 = (t1 == teamIdx) ? t1++ : t1;
+			if (t1 == teamIdx) {
+				t1++;
+			}
 			int maxWinsRemainingT1 = maxWins - w[t1];
 			fn.addEdge(new FlowEdge(i, v - 1, (double) maxWinsRemainingT1));
 			t1++;
@@ -178,9 +193,15 @@ public class BaseballElimination {
 		validateArgs(teamIdx);
 
 		Set<String> eTeams = new HashSet<String>();
+
+		// boundary case: no or only 1 team
+		if (teams.size() <= 1) {
+			return eTeams;
+		}
+
 		// trivial elimination
 		int maxWins = w[teamIdx] + r[teamIdx];
-		for (int i = 0; i < teamIdx; i++) {
+		for (int i = 0; i < teams.size(); i++) {
 			if (w[i] > maxWins) {
 				eTeams.add(teams.get(i));
 			}
@@ -191,7 +212,7 @@ public class BaseballElimination {
 
 		FlowNetwork fn = constructFlowNetwork(teamIdx, maxWins);
 		FordFulkerson ff = new FordFulkerson(fn, 0, fn.V() - 1);
-		int numTeams = this.numTeams - 1;
+		int numTeams = teams.size() - 1;
 		int nGameVertices = numTeams * (numTeams - 1) / 2;
 
 		for (int i = 1; i <= nGameVertices; i++) {
@@ -201,16 +222,21 @@ public class BaseballElimination {
 				eTeams.add(teams.get(eliminatingTeamIdx[1]));
 			}
 		}
+		
+		// return null if not eliminated
+		if (eTeams.size()==0){
+			return null;
+		}
 		return eTeams;
 	}
 
-	public int[] computeTeams(int nGameV, int teamIdx, int numTeams, int nGameVertices) {
+	private int[] computeTeams(int nGameV, int teamIdx, int numTeams, int nGameVertices) {
 		int t1 = 0;
 		int t2 = 1;
 		for (int i = 1; i <= nGameVertices; i++) {
 			// get capacity
-			int t11 = t1 >= teamIdx ? t1+1 : t1;
-			int t12 = t2 >= teamIdx ? t2+1 : t2;
+			int t11 = t1 >= teamIdx ? t1 + 1 : t1;
+			int t12 = t2 >= teamIdx ? t2 + 1 : t2;
 			if (i == nGameV) {
 				return new int[] { t11, t12 };
 			}
@@ -235,17 +261,18 @@ public class BaseballElimination {
 
 	public static void main(String[] args) {
 		BaseballElimination division = new BaseballElimination(args[0]);
-		for (String team : division.teams()) {
-			if (division.isEliminated(team)) {
-				StdOut.print(team + " is eliminated by the subset R = { ");
-				for (String t : division.certificateOfElimination(team)) {
-					StdOut.print(t + " ");
-				}
-				StdOut.println("}");
-			} else {
-				StdOut.println(team + " is not eliminated");
-			}
-		}
+		System.out.println(division.against("New_York", "Philadelphia"));
+		// for (String team : division.teams()) {
+		// if (division.isEliminated(team)) {
+		// StdOut.print(team + " is eliminated by the subset R = { ");
+		// for (String t : division.certificateOfElimination(team)) {
+		// StdOut.print(t + " ");
+		// }
+		// StdOut.println("}");
+		// } else {
+		// StdOut.println(team + " is not eliminated");
+		// }
+		// }
 		System.exit(0);
 	}
 }
@@ -267,14 +294,14 @@ class Match {
 		}
 		return false;
 	}
-	
+
 	@Override
 	public int hashCode() {
 		return t1.hashCode() + t2.hashCode();
 	}
-	
+
 	@Override
 	public String toString() {
-		return "Match [t1="+t1 + "; t2=" +t2 +"]";
+		return "Match [t1=" + t1 + "; t2=" + t2 + "]";
 	}
 }
